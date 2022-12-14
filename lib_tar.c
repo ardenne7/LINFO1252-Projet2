@@ -1,5 +1,46 @@
 #include "lib_tar.h"
 
+
+unsigned int read_header(int tar_fd, tar_header_t* current) {
+    unsigned int checksum_verif = 0;
+    read(tar_fd, current->name, 100);
+    read(tar_fd, current->mode, 8);
+    read(tar_fd, current->uid, 8);
+    read(tar_fd, current->gid, 8);
+    read(tar_fd, current->size, 12);
+    read(tar_fd, current->mtime, 12);
+    read(tar_fd, current->chksum, 8);
+    read(tar_fd, &current->typeflag, 1);
+    read(tar_fd, current->linkname, 100);
+    read(tar_fd, current->magic, 6);
+    read(tar_fd, current->version, 2);
+    read(tar_fd, current->uname, 32);
+    read(tar_fd, current->gname, 32);
+    read(tar_fd, current->devmajor, 8);
+    read(tar_fd, current->devminor, 8);
+    read(tar_fd, current->prefix, 155);
+    read(tar_fd, current->padding, 12);
+
+    checksum_verif += (unsigned int) TAR_INT(current->name);
+    checksum_verif += (unsigned int) TAR_INT(current->mode);
+    checksum_verif += (unsigned int) TAR_INT(current->uid);
+    checksum_verif += (unsigned int) TAR_INT(current->gid);
+    checksum_verif += (unsigned int) TAR_INT(current->size);
+    checksum_verif += (unsigned int) TAR_INT(current->mtime);
+    checksum_verif += (unsigned int) TAR_INT(&current->typeflag);
+    checksum_verif += (unsigned int) TAR_INT(current->linkname);
+    checksum_verif += (unsigned int) TAR_INT(current->magic);
+    checksum_verif += (unsigned int) TAR_INT(current->version);
+    checksum_verif += (unsigned int) TAR_INT(current->uname);
+    checksum_verif += (unsigned int) TAR_INT(current->gname);
+    checksum_verif += (unsigned int) TAR_INT(current->devmajor);
+    checksum_verif += (unsigned int) TAR_INT(current->devminor);
+    checksum_verif += (unsigned int) TAR_INT(current->prefix);
+    checksum_verif += (unsigned int) TAR_INT(current->padding);
+
+    return checksum_verif;
+}
+
 /**
  * Checks whether the archive is valid.
  *
@@ -16,6 +57,30 @@
  *         -3 if the archive contains a header with an invalid checksum value
  */
 int check_archive(int tar_fd) {
+    tar_header_t* current = malloc(sizeof(tar_header_t));
+    unsigned int checksum_verif = read_header(tar_fd, current);
+
+    char first5bits = (*current->magic & 0b11111) >> 1;
+    printf("%s \n",(char*) &first5bits);
+    printf("%d \n",*current->magic & 0b000001);
+
+    if (strcmp(&first5bits, TMAGIC) == 0 && (*current->magic & 0b000001) == 0x00) {
+        return -1;
+    }
+
+    if (strcmp(current->version, TVERSION) == 0) {
+        return -2;
+    }
+
+    if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
+        return -3;
+    }
+
+    printf("Name of file: %s \n", current->name);
+    printf("Size of file: %s \n", current->size);
+
+    printf("%d \n", checksum_verif);
+
     return 0;
 }
 
