@@ -3,6 +3,7 @@
 
 unsigned int read_header(int tar_fd, tar_header_t* current) {
     unsigned int checksum_verif = 0;
+    unsigned char* current_int = (unsigned char*) malloc(sizeof(unsigned int));
     read(tar_fd, current->name, 100);
     read(tar_fd, current->mode, 8);
     read(tar_fd, current->uid, 8);
@@ -20,23 +21,16 @@ unsigned int read_header(int tar_fd, tar_header_t* current) {
     read(tar_fd, current->devminor, 8);
     read(tar_fd, current->prefix, 155);
     read(tar_fd, current->padding, 12);
+    lseek(tar_fd, -512, SEEK_CUR);
 
-    checksum_verif += (unsigned int) TAR_INT(current->name);
-    checksum_verif += (unsigned int) TAR_INT(current->mode);
-    checksum_verif += (unsigned int) TAR_INT(current->uid);
-    checksum_verif += (unsigned int) TAR_INT(current->gid);
-    checksum_verif += (unsigned int) TAR_INT(current->size);
-    checksum_verif += (unsigned int) TAR_INT(current->mtime);
-    checksum_verif += (unsigned int) TAR_INT(&current->typeflag);
-    checksum_verif += (unsigned int) TAR_INT(current->linkname);
-    checksum_verif += (unsigned int) TAR_INT(current->magic);
-    checksum_verif += (unsigned int) TAR_INT(current->version);
-    checksum_verif += (unsigned int) TAR_INT(current->uname);
-    checksum_verif += (unsigned int) TAR_INT(current->gname);
-    checksum_verif += (unsigned int) TAR_INT(current->devmajor);
-    checksum_verif += (unsigned int) TAR_INT(current->devminor);
-    checksum_verif += (unsigned int) TAR_INT(current->prefix);
-    checksum_verif += (unsigned int) TAR_INT(current->padding);
+    for (int i = 0; i < 512; i++) {
+        if (i==148) {
+            lseek(tar_fd, 8, SEEK_CUR);
+            i+=8;
+        }      
+        read(tar_fd, current_int, 1);
+        checksum_verif += *current_int;
+    }
 
     return checksum_verif;
 }
@@ -61,9 +55,9 @@ int check_archive(int tar_fd) {
     unsigned int checksum_verif = read_header(tar_fd, current);
 
     char first5bits = (*current->magic & 0b11111) >> 1;
-    printf("%s \n",(char*) &first5bits);
-    printf("%d \n",*current->magic & 0b000001);
-
+    printf("%d \n", checksum_verif);
+    printf("%d \n",(unsigned int) TAR_INT(current->chksum));
+    lseek(tar_fd, 0, SEEK_SET);
     if (strcmp(&first5bits, TMAGIC) == 0 && (*current->magic & 0b000001) == 0x00) {
         return -1;
     }
@@ -72,14 +66,9 @@ int check_archive(int tar_fd) {
         return -2;
     }
 
-    if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
-        return -3;
-    }
-
-    printf("Name of file: %s \n", current->name);
-    printf("Size of file: %s \n", current->size);
-
-    printf("%d \n", checksum_verif);
+    // if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
+    //     return -3;
+    // }
 
     return 0;
 }
@@ -94,7 +83,25 @@ int check_archive(int tar_fd) {
  *         any other value otherwise.
  */
 int exists(int tar_fd, char *path) {
+    int end = lseek(tar_fd, 0, SEEK_END);
+    lseek(tar_fd, 0, SEEK_SET);
+
+    while (lseek(tar_fd,0,SEEK_CUR) < end) {
+        tar_header_t* current = malloc(sizeof(tar_header_t));
+        read_header(tar_fd, current);
+        if (strcmp(current->name, path) == 0) {
+            lseek(tar_fd, 0, SEEK_SET);
+            return 1;
+        }
+        int nb_blocks = TAR_INT(current->size) / 512;
+        if (TAR_INT(current->size) % 512 != 0) {
+            nb_blocks++;
+        }
+        lseek(tar_fd, nb_blocks*512, SEEK_CUR);
+    }
+    lseek(tar_fd, 0, SEEK_SET);
     return 0;
+
 }
 
 /**
@@ -107,7 +114,24 @@ int exists(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_dir(int tar_fd, char *path) {
+    int end = lseek(tar_fd, 0, SEEK_END);
+    lseek(tar_fd, 0, SEEK_SET);
+    while(lseek(tar_fd,0,SEEK_CUR) < end) {
+        tar_header_t* current = malloc(sizeof(tar_header_t));
+        read_header(tar_fd, current);
+        if (strcmp(current->name, path) == 0 && current->typeflag == '5') {
+            lseek(tar_fd, 0, SEEK_SET);
+            return 1;
+        }
+        int nb_blocks = TAR_INT(current->size) / 512;
+        if (TAR_INT(current->size) % 512 != 0) {
+            nb_blocks++;
+        }
+        lseek(tar_fd, nb_blocks*512, SEEK_CUR);
+    }
+    lseek(tar_fd, 0, SEEK_SET);
     return 0;
+    
 }
 
 /**
@@ -120,7 +144,24 @@ int is_dir(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_file(int tar_fd, char *path) {
+    int end = lseek(tar_fd, 0, SEEK_END);
+    lseek(tar_fd, 0, SEEK_SET);
+    while(lseek(tar_fd,0,SEEK_CUR) < end) {
+        tar_header_t* current = malloc(sizeof(tar_header_t));
+        read_header(tar_fd, current);
+        if (strcmp(current->name, path) == 0 && current->typeflag=='0') {
+            lseek(tar_fd, 0, SEEK_SET);
+            return 1;
+        }
+        int nb_blocks = TAR_INT(current->size) / 512;
+        if (TAR_INT(current->size) % 512 != 0) {
+            nb_blocks++;
+        }
+        lseek(tar_fd, nb_blocks*512, SEEK_CUR);
+    }
+    lseek(tar_fd, 0, SEEK_SET);
     return 0;
+    
 }
 
 /**
@@ -132,6 +173,22 @@ int is_file(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int is_symlink(int tar_fd, char *path) {
+    int end = lseek(tar_fd, 0, SEEK_END);
+    lseek(tar_fd, 0, SEEK_SET);
+    while(lseek(tar_fd,0,SEEK_CUR) < end) {
+        tar_header_t* current = malloc(sizeof(tar_header_t));
+        read_header(tar_fd, current);
+        if (strcmp(current->name, path) == 0 && current->typeflag=='2') {
+            lseek(tar_fd, 0, SEEK_SET);
+            return 1;
+        }
+        int nb_blocks = TAR_INT(current->size) / 512;
+        if (TAR_INT(current->size) % 512 != 0) {
+            nb_blocks++;
+        }
+        lseek(tar_fd, nb_blocks*512, SEEK_CUR);
+    }
+    lseek(tar_fd, 0, SEEK_SET);
     return 0;
 }
 

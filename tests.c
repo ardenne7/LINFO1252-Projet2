@@ -39,5 +39,15 @@ int main(int argc, char **argv) {
     int ret = check_archive(fd);
     printf("check_archive returned %d\n", ret);
 
+    int ret2 = exists(fd, "pute/");
+    printf("exist returned %d\n", ret2);
+
+    int ret3 = is_file(fd, "pute/");
+    printf("is_file returned %d\n", ret3);
+
+    int ret4 = is_dir(fd, "pute/");
+    printf("is_dir returned %d\n", ret4);
+
+
     return 0;
 }

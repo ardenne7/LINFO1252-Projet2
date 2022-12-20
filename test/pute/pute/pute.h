@@ -1,0 +1,1 @@
+char* pute = "Name: pute";
