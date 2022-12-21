@@ -51,8 +51,25 @@ int main(int argc, char **argv) {
     int ret5 = is_symlink(fd, "test_ls");
     printf("is_symlink returned %d\n", ret5);
 
-    
+    // char** entries = malloc(10*sizeof(char*));
+    // size_t no_entries = 10;
 
+    // int ret6 = list(fd, "folder1/", entries, &no_entries);
+    // printf("list returned %d \n", ret6);
+    // printf("Size of list returned %ld \n", no_entries);
+    // for (int i = 0; i < no_entries; i++) {
+    //     printf("list returned %s \n", entries[i]);
+    // }
+
+    char** entries2 = malloc(10*sizeof(char*));
+    size_t no_entries2 = 10;
+
+    int ret7 = list(fd, "symlink_folder", entries2, &no_entries2);
+    printf("list returned %d \n", ret7);
+    printf("Size of list returned %ld \n", no_entries2);
+    for (int i = 0; i < no_entries2; i++) {
+        printf("list returned %s \n", entries2[i]);
+    }
 
     return 0;
 }

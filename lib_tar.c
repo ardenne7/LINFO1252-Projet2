@@ -36,6 +36,17 @@ unsigned int read_header(int tar_fd, tar_header_t* current) {
     return checksum_verif;
 }
 
+int count_slashes(char *str) {
+  int count = 0;
+  for (int i = 0; str[i] != '\0'; i++) {
+    if (str[i] == 47) {
+      count++;
+    }
+  }
+  return count;
+}
+
+
 /**
  * Checks whether the archive is valid.
  *
@@ -220,12 +231,16 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     int end = lseek(tar_fd, 0, SEEK_END);
     lseek(tar_fd, 0, SEEK_SET);
     int i = 0;
+    int nb_backslash = count_slashes(path);
 
     while(lseek(tar_fd,0,SEEK_CUR) < end) {
         tar_header_t* current = malloc(sizeof(tar_header_t));
         read_header(tar_fd, current);
+        if (current->typeflag == SYMTYPE && strcmp(current->name, path) == 0) {
+            list(new_fd, current->linkname, entries, no_entries);
+        }
 
-        if (strstr(current->name, path) == 0) {
+        if ((strstr(current->name, path) != NULL) && (strcmp(current->name, path) != 0) && ((count_slashes(current->name) == nb_backslash) || (count_slashes(current->name) == nb_backslash+1 && current->name[strlen(current->name)-1] == 47))) {
             entries[i] = current->name;
             i++;
             if (i == *no_entries) {
@@ -241,14 +256,14 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
         }
         lseek(tar_fd, nb_blocks*512, SEEK_CUR);
     }
+    *no_entries = i;
     lseek(tar_fd, 0, SEEK_SET);
 
     if (i == 0) {
-        return 1;
+        return 0;
     }
 
-    *no_entries = i;
-    return 0;
+    return 1;
 }
 
 /**
