@@ -237,7 +237,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
         tar_header_t* current = malloc(sizeof(tar_header_t));
         read_header(tar_fd, current);
         if (current->typeflag == SYMTYPE && strcmp(current->name, path) == 0) {
-            list(new_fd, current->linkname, entries, no_entries);
+            list(tar_fd, current->linkname, entries, no_entries);
         }
 
         if ((strstr(current->name, path) != NULL) && (strcmp(current->name, path) != 0) && ((count_slashes(current->name) == nb_backslash) || (count_slashes(current->name) == nb_backslash+1 && current->name[strlen(current->name)-1] == 47))) {
