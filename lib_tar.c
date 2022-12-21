@@ -66,11 +66,13 @@ int check_archive(int tar_fd) {
     tar_header_t* current = malloc(sizeof(tar_header_t));
     unsigned int checksum_verif = read_header(tar_fd, current);
 
-    char first5bits = (*current->magic & 0b11111) >> 1;
+    char first5bits[2];
+    first5bits[0] = (*current->magic & 0b11111) >> 1;
+    first5bits[1] = '\0';
     printf("%d \n", checksum_verif);
     printf("%d \n",(unsigned int) TAR_INT(current->chksum));
     lseek(tar_fd, 0, SEEK_SET);
-    if (strcmp(&first5bits, TMAGIC) == 0 && (*current->magic & 0b000001) == 0x00) {
+    if (strcmp(first5bits, TMAGIC) == 0 && (*current->magic & 0b000001) == 0x00) {
         return -1;
     }
 
