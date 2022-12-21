@@ -63,37 +63,42 @@ int count_slashes(char *str) {
  *         -3 if the archive contains a header with an invalid checksum value
  */
 int check_archive(int tar_fd) {
-    tar_header_t* current = malloc(sizeof(tar_header_t));
-    unsigned int checksum_verif = read_header(tar_fd, current);
-
-    char first5bits[2];
-    first5bits[0] = (*current->magic & 0b11111) >> 1;
-    first5bits[1] = '\0';
-    printf("%d \n", checksum_verif);
-    printf("%d \n",(unsigned int) TAR_INT(current->chksum));
-    lseek(tar_fd, 0, SEEK_SET);
-    if (strcmp(first5bits, TMAGIC) == 0 && (*current->magic & 0b000001) == 0x00) {
-        return -1;
-    }
-
-    if (strcmp(current->version, TVERSION) == 0) {
-        return -2;
-    }
-
-    if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
-        return -3;
-    }
+    unsigned int checksum_verif;
 
     int end = lseek(tar_fd, 0, SEEK_END);
     lseek(tar_fd, 0, SEEK_SET);
     int count = 0;
+    char first5bits[6];
 
     while (lseek(tar_fd,0,SEEK_CUR) < end) {
         tar_header_t* current = malloc(sizeof(tar_header_t));
-        read_header(tar_fd, current);
-        if (current->size != 0) {
-            count++;
+        checksum_verif = read_header(tar_fd, current);
+        first5bits[0] = current->magic[0];
+        first5bits[1] = current->magic[1];
+        first5bits[2] = current->magic[2];
+        first5bits[3] = current->magic[3];
+        first5bits[4] = current->magic[4];
+        first5bits[5] = '\0';
+
+        if (current->name[0] == '\0') {
+            break;
         }
+        count++;
+
+        if (first5bits[0] != 'u' || first5bits[1] != 's' || first5bits[2] != 't' || first5bits[3] != 'a' || first5bits[4] != 'r' || first5bits[5] != '\0') {
+            printf("%s \n", first5bits);
+            return -1;
+        }
+
+        if (current->version[0] != '0' || current->version[1] != '0') {
+            return -2;
+        }
+
+        if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
+            printf("%s \n", current->name);
+            return -3;
+        }
+
         int nb_blocks = TAR_INT(current->size) / 512;
         if (TAR_INT(current->size) % 512 != 0) {
             nb_blocks++;
@@ -253,6 +258,10 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     int i = 0;
     int nb_backslash = count_slashes(path);
 
+    if (exists(tar_fd, path) == 0) {
+        return 0;
+    }
+
     while(lseek(tar_fd,0,SEEK_CUR) < end) {
         tar_header_t* current = malloc(sizeof(tar_header_t));
         read_header(tar_fd, current);
@@ -279,11 +288,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     }
     *no_entries = i;
     lseek(tar_fd, 0, SEEK_SET);
-
-    if (i == 0) {
-        return 0;
-    }
-
+    
     return 1;
 }
 
