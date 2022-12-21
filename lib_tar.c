@@ -84,7 +84,25 @@ int check_archive(int tar_fd) {
         return -3;
     }
 
-    return 0;
+    int end = lseek(tar_fd, 0, SEEK_END);
+    lseek(tar_fd, 0, SEEK_SET);
+    int count = 0;
+
+    while (lseek(tar_fd,0,SEEK_CUR) < end) {
+        tar_header_t* current = malloc(sizeof(tar_header_t));
+        read_header(tar_fd, current);
+        if (current->size != 0) {
+            count++;
+        }
+        int nb_blocks = TAR_INT(current->size) / 512;
+        if (TAR_INT(current->size) % 512 != 0) {
+            nb_blocks++;
+        }
+        lseek(tar_fd, nb_blocks*512, SEEK_CUR);
+    }
+    lseek(tar_fd, 0, SEEK_SET);
+
+    return count;
 }
 
 /**
