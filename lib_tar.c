@@ -255,28 +255,28 @@ int is_symlink(int tar_fd, char *path) {
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     int end = lseek(tar_fd, 0, SEEK_END);
     lseek(tar_fd, 0, SEEK_SET);
-    int i = 0;
+    size_t i = 0;
     int nb_backslash = count_slashes(path);
-
-    if (exists(tar_fd, path) == 0) {
-        return 0;
-    }
+    // printf("path: %s\n", path);
 
     while(lseek(tar_fd,0,SEEK_CUR) < end) {
         tar_header_t* current = malloc(sizeof(tar_header_t));
         read_header(tar_fd, current);
         if (current->typeflag == SYMTYPE && strcmp(current->name, path) == 0) {
-            printf("fried chicken \n");
-            return list(tar_fd, current->linkname, entries, no_entries);
+            if(is_file(tar_fd, current->linkname) == 1) {
+                return 0;
+            }
+            char* newPath = strcat(current->linkname, "/");
+            if(is_dir(tar_fd, newPath) == 0) {
+                return 0;
+            }
+            printf("newPath: %s", newPath);
+            return list(tar_fd, newPath, entries, no_entries);
         }
 
         if ((strstr(current->name, path) != NULL) && (strcmp(current->name, path) != 0) && ((count_slashes(current->name) == nb_backslash) || (count_slashes(current->name) == nb_backslash+1 && current->name[strlen(current->name)-1] == 47))) {
             entries[i] = current->name;
             i++;
-            if (i == *no_entries) {
-                *no_entries = i;
-                return 1;
-            }
         }
 
 
@@ -288,7 +288,11 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
     }
     *no_entries = i;
     lseek(tar_fd, 0, SEEK_SET);
-    
+
+    if(i == 0) {
+        return 0;
+    }
+
     return 1;
 }
 
@@ -311,7 +315,7 @@ int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
  *
  */
 ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *len) {
-    if(path[strlen(path)-1]!='/'){
+    if (path[strlen(path)-1] =='/'){
         return -1;
     }
     int end = lseek(tar_fd, 0, SEEK_END);
@@ -324,20 +328,21 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
             return read_file(tar_fd, current->linkname,offset,dest,len);
         }
 
-        if (path==current->name) {
-            if(offset>*current->size){
+        if (strcmp(current->name, path) == 0) {
+            if(offset>TAR_INT(current->size)){
                 return -2;
             }
-            if(*current->size - offset <= *len){
-                *len = *current->size - offset;
+            printf("size: %ld \n", TAR_INT(current->size));
+            if(TAR_INT(current->size) - offset <= *len){
+                *len = TAR_INT(current->size) - offset;
                 lseek(tar_fd,offset,SEEK_CUR);
-                read(tar_fd,dest, *current->size - offset);
+                read(tar_fd,dest, TAR_INT(current->size) - offset);
                 return 0;
             }
-            else if(*current->size - offset > *len){
+            else if(TAR_INT(current->size) - offset > *len){
                 lseek(tar_fd,offset,SEEK_CUR);
                 read(tar_fd,dest,*len);
-                return (ssize_t) current->size-offset-*len;
+                return (ssize_t) TAR_INT(current->size)-offset-*len;
             }
         }
 
