@@ -291,7 +291,6 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
     }
     int end = lseek(tar_fd, 0, SEEK_END);
     lseek(tar_fd, 0, SEEK_SET);
-    int i = 0;
 
     while(lseek(tar_fd,0,SEEK_CUR) < end) {
         tar_header_t* current = malloc(sizeof(tar_header_t));
@@ -301,24 +300,20 @@ ssize_t read_file(int tar_fd, char *path, size_t offset, uint8_t *dest, size_t *
         }
 
         if (path==current->name) {
-            if(offset>current->size){
+            if(offset>*current->size){
                 return -2;
             }
-            if(current->size - offset <= len){
-                len = current->size - offset;
+            if(*current->size - offset <= *len){
+                *len = *current->size - offset;
                 lseek(tar_fd,offset,SEEK_CUR);
-                read(tar_fd,dest, current->size - offset);
+                read(tar_fd,dest, *current->size - offset);
                 return 0;
             }
-            else if(current->size - offset > len){
+            else if(*current->size - offset > *len){
                 lseek(tar_fd,offset,SEEK_CUR);
-                read(tar_fd,dest,len);
-                return current->size-offset-len;
-                
-
+                read(tar_fd,dest,*len);
+                return (ssize_t) current->size-offset-*len;
             }
-        
-
         }
 
     }
