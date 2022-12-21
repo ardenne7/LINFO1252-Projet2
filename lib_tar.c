@@ -26,6 +26,7 @@ unsigned int read_header(int tar_fd, tar_header_t* current) {
     for (int i = 0; i < 512; i++) {
         if (i==148) {
             lseek(tar_fd, 8, SEEK_CUR);
+            checksum_verif+=256;
             i+=8;
         }      
         read(tar_fd, current_int, 1);
@@ -66,9 +67,9 @@ int check_archive(int tar_fd) {
         return -2;
     }
 
-    // if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
-    //     return -3;
-    // }
+    if (checksum_verif != (unsigned int) TAR_INT(current->chksum)) {
+        return -3;
+    }
 
     return 0;
 }
@@ -216,6 +217,37 @@ int is_symlink(int tar_fd, char *path) {
  *         any other value otherwise.
  */
 int list(int tar_fd, char *path, char **entries, size_t *no_entries) {
+    int end = lseek(tar_fd, 0, SEEK_END);
+    lseek(tar_fd, 0, SEEK_SET);
+    int i = 0;
+
+    while(lseek(tar_fd,0,SEEK_CUR) < end) {
+        tar_header_t* current = malloc(sizeof(tar_header_t));
+        read_header(tar_fd, current);
+
+        if (strstr(current->name, path) == 0) {
+            entries[i] = current->name;
+            i++;
+            if (i == *no_entries) {
+                *no_entries = i;
+                return 1;
+            }
+        }
+
+
+        int nb_blocks = TAR_INT(current->size) / 512;
+        if (TAR_INT(current->size) % 512 != 0) {
+            nb_blocks++;
+        }
+        lseek(tar_fd, nb_blocks*512, SEEK_CUR);
+    }
+    lseek(tar_fd, 0, SEEK_SET);
+
+    if (i == 0) {
+        return 1;
+    }
+
+    *no_entries = i;
     return 0;
 }
 

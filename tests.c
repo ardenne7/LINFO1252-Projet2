@@ -39,14 +39,19 @@ int main(int argc, char **argv) {
     int ret = check_archive(fd);
     printf("check_archive returned %d\n", ret);
 
-    int ret2 = exists(fd, "pute/");
+    int ret2 = exists(fd, "folder1/");
     printf("exist returned %d\n", ret2);
 
-    int ret3 = is_file(fd, "pute/");
+    int ret3 = is_file(fd, "folder1/");
     printf("is_file returned %d\n", ret3);
 
-    int ret4 = is_dir(fd, "pute/");
+    int ret4 = is_dir(fd, "folder1/");
     printf("is_dir returned %d\n", ret4);
+
+    int ret5 = is_symlink(fd, "test_ls");
+    printf("is_symlink returned %d\n", ret5);
+
+    
 
 
     return 0;
